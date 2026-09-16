@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Atlas Cerebral 3D</title>
+
+<style>
+html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+}
+
+#pantalla {
+    width: 100%;
+    height: 100%;
+    background: #e9edf2;
+}
+
+#estado {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 20;
+    background: white;
+    padding: 12px 18px;
+    border-radius: 8px;
+    box-shadow: 0 3px 12px rgba(0,0,0,.2);
+}
+
+#error {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    z-index: 30;
+    width: 400px;
+    max-width: 90%;
+}
+</style>
+</head>
+
+<body>
+
+<div id="pantalla"></div>
+
+<div id="estado">
+    Iniciando visor 3D...
+</div>
+
+<div id="error">
+    <h2>No se pudo cargar el cerebro</h2>
+    <p id="mensajeError"></p>
+</div>
+
+<script type="module">
+
+import * as THREE from
+"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+
+import { OrbitControls } from
+"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
+
+import { GLTFLoader } from
+"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
+
+
+/* ESCENA */
+
+const contenedor =
+document.getElementById("pantalla");
+
+const escena =
+new THREE.Scene();
+
+escena.background =
+new THREE.Color(0xe9edf2);
+
+
+/* CÁMARA */
+
+const camara =
+new THREE.PerspectiveCamera(
+    45,
+    contenedor.clientWidth /
+    contenedor.clientHeight,
+    0.01,
+    1000
+);
+
+camara.position.set(0, 0, 5);
+
+
+/* RENDERIZADOR */
+
+const renderer =
+new THREE.WebGLRenderer({
+    antialias: true
+});
+
+renderer.setPixelRatio(
+    window.devicePixelRatio
+);
+
+renderer.setSize(
+    contenedor.clientWidth,
+    contenedor.clientHeight
+);
+
+contenedor.appendChild(
+    renderer.domElement
+);
+
+
+/* CONTROLES */
+
+const controles =
+new OrbitControls(
+    camara,
+    renderer.domElement
+);
+
+controles.enableDamping = true;
+
+
+/* LUCES */
+
+escena.add(
+    new THREE.HemisphereLight(
+        0xffffff,
+        0x777777,
+        3
+    )
+);
+
+const luz =
+new THREE.DirectionalLight(
+    0xffffff,
+    3
+);
+
+luz.position.set(5,5,5);
+
+escena.add(luz);
+
+
+/* CARGADOR */
+
+const loader =
+new GLTFLoader();
+
+
+const estado =
+document.getElementById("estado");
+
+
+loader.load(
+
+    "./cerebro.glb",
+
+    function(gltf) {
+
+        const cerebro =
+        gltf.scene;
+
+        escena.add(cerebro);
+
+
+        /* CENTRAR */
+
+        const caja =
+        new THREE.Box3()
+        .setFromObject(cerebro);
+
+        const centro =
+        caja.getCenter(
+            new THREE.Vector3()
+        );
+
+        cerebro.position.sub(
+            centro
+        );
+
+
+        /* ESCALAR */
+
+        const tamaño =
+        caja.getSize(
+            new THREE.Vector3()
+        );
+
+        const maximo =
+        Math.max(
+            tamaño.x,
+            tamaño.y,
+            tamaño.z
+        );
+
+        if (maximo > 0) {
+
+            cerebro.scale.setScalar(
+                3 / maximo
+            );
+
+        }
+
+
+        estado.textContent =
+        "✓ Cerebro cargado — puedes moverlo con el mouse";
+
+
+        /*
+        MOSTRAMOS EN CONSOLA
+        CÓMO ESTÁ CONSTRUIDO EL GLB
+        */
+
+        cerebro.traverse(
+            objeto => {
+
+                console.log(
+                    "OBJETO:",
+                    objeto.name,
+                    "| TIPO:",
+                    objeto.type
+                );
+
+            }
+        );
+
+    },
+
+
+    function(xhr) {
+
+        if (xhr.total > 0) {
+
+            const porcentaje =
+            Math.round(
+                xhr.loaded /
+                xhr.total *
+                100
+            );
+
+            estado.textContent =
+            "Cargando modelo: "
+            + porcentaje
+            + "%";
+
+        }
+
+    },
+
+
+    function(error) {
+
+        console.error(
+            "ERROR GLB:",
+            error
+        );
+
+        estado.style.display =
+        "none";
+
+        document.getElementById(
+            "error"
+        ).style.display =
+        "block";
+
+        document.getElementById(
+            "mensajeError"
+        ).innerHTML =
+
+        "El navegador no pudo encontrar o leer " +
+        "<strong>cerebro.glb</strong>.<br><br>" +
+
+        "Comprueba que el archivo esté en la misma " +
+        "carpeta que index.html.";
+
+    }
+
+);
+
+
+/* ANIMACIÓN */
+
+function animar() {
+
+    requestAnimationFrame(
+        animar
+    );
+
+    controles.update();
+
+    renderer.render(
+        escena,
+        camara
+    );
+}
+
+animar();
+
+
+/* RESPONSIVE */
+
+window.addEventListener(
+    "resize",
+    () => {
+
+        camara.aspect =
+        contenedor.clientWidth /
+        contenedor.clientHeight;
+
+        camara.updateProjectionMatrix();
+
+        renderer.setSize(
+            contenedor.clientWidth,
+            contenedor.clientHeight
+        );
+
+    }
+);
+
+</script>
+
+</body>
+</html>
